@@ -43,8 +43,9 @@ struct e_i_t_packet {
         u_char ip_p; // IP 프로토콜 유형
         u_short ip_sum;
        
-	    uint8_t src_ip[PROTOCOL_LEN]; // 출발지 IP 주소
-        uint8_t dst_ip[PROTOCOL_LEN]; // 목적지 IP 주소
+	    struct in_addr src_ip; // 출발지 IP 주소
+        struct in_addr dst_ip; // 목적지 IP 주소
+        
         u_short th_sport; // 출발지 TCP 주소
         u_short th_dport; // 목적지 TCP 주소
         u_int th_seq;
@@ -66,19 +67,14 @@ struct e_i_t_packet {
         u_short th_urp;
 };
 
-#define IP_HL(ip) (((ip)->ip_vhl) & 0x0f)
-#define IP_V(ip) (((ip)->ip_vhl) >> 4)
-#define SIZE_ETHERNET 14
-void send_packet(const u_char *d_packet, pcap_t* handle)
+
+void send_packet(struct e_i_t_packet packet, pcap_t* handle)
 {
-	if(pcap_sendpacket(handle, d_packet, 200) != 0)
+	uint8_t *p = (uint8_t *)&packet;
+	if(pcap_sendpacket(handle, p, 54) != 0)
 		fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
 }
 
-
-
-
-struct *e_i_t_packet;
 
 void * get_mac_address(uint8_t * my_MAC)
 {
@@ -132,28 +128,21 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_MAC,
         {
             packet.ether_shost[i]=my_MAC[i]; // 출발지 MAC 주소
         }
-        u_char ether_dhost[ETHER_ADDR_LEN]; // 목적지 MAC 주소
-        
         packet.ether_type=0x0800;
+        
         packet.ip_buf=0x4500;
 	    packet.total_len=0x0028;
 
-        u_short ip_id;
-        u_short ip_off;
+        packet.ip_id=0x0000;
+        packet.ip_off=0x0000;
         
         packet.ip_ttl=0x40;
         packet.ip_p=0x06; // IP 프로토콜 유형
-        u_short ip_sum;
+        packet.ip_sum=0x0000;
        
+        packet.src_ip.s_addr=inet_addr(argv); // 출발지 IP 주소
+        packet.dst_ip.s_addr=inet_addr(argv); // 목적지 IP 주소
        
-       for(i=0;i<4;i++)
-            packet.src_ip[i]=my_ipaddr[i]; // 출발지 IP 주소
-        
-        uint32_t num = inet_addr(argv);
-        packet.dst_ip[0] = num; // 목적지 IP 주소
-        packet.dst_ip[0] = num >> 8; // 목적지 IP 주소
-        packet.dst_ip[0] = num >> 16; // 목적지 IP 주소
-        packet.dst_ip[0] = num >> 24; // 목적지 IP 주소
 
         packet.th_sport=0xec74; // 출발지 TCP 주소
         packet.th_dport=0x0050; // 목적지 TCP 주소
@@ -161,22 +150,22 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_MAC,
         packet.th_ack=0x00000000;
         packet.th_offx2=0xa0;
         
-        u_char th_flags=0x02;
+        packet.th_flags=0x02;
         
-        u_short th_win=0x7210;
-        u_short th_sum;
+        packet.th_win=0x7210;
+        packet.th_sum=0x0000;
         packet.th_urp=0x0000;
     
-        
+        printf("finish make packet...\n\n");
 
         return packet;
 }
 
-int main(void) {
+int main(int argc, char* argv[]) {
 
     uint8_t my_MAC[6];
     uint8_t my_ipaddr[4];
-    strutc e_i_t_packet packet;	
+    struct e_i_t_packet packet;
     
 
 	dev = pcap_lookupdev(errbuf);
@@ -185,10 +174,7 @@ int main(void) {
                 return 0;
         }
         printf("나의 네트워크 장치: %s\n", dev);
-        if (pcap_lookupnet(dev, &net, &mask, errbuf) == -1) {
-                printf("장치의 주소를 찾을 수 없습니다.\n");
-                return 0;
-        }
+       
         handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
         if (handle == NULL) {
                 printf("장치를 열 수 없습니다.\n");
@@ -198,21 +184,16 @@ int main(void) {
 
     get_mac_address(my_MAC);
 	get_ip_address(my_ipaddr, dev);	
+
         
         while(1)
-{       
+{   
+    printf("Let's Make packet....\n\n");
+
         packet=request_packet(packet, my_MAC, my_ipaddr, argv[1]);
+        send_packet(packet, handle);
+        sleep(1);
 }
-
-        while(pcap_next_ex(handle, &header, &packet) == 1) 
-        {
-
-		printf("sending packet to target....\n");
-		send_packet(packet,handle);
-        }
-
-
-
 
 	return 0;
 }
