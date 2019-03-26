@@ -28,11 +28,7 @@ struct sniff_ethernet {
 #define IP_HL(ip) (((ip)->ip_vhl) & 0x0f)
 #define IP_V(ip) (((ip)->ip_vhl) >> 4)
 
-void send_packet(const u_char *d_packet, pcap_t* handle)
-{
-	if(pcap_sendpacket(handle, d_packet, 200) != 0)
-		fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
-}
+
 struct sniff_ip {
         u_char ip_vhl;
         u_char ip_tos;
@@ -157,7 +153,7 @@ int main(void) {
         printf("나의 IP주소: %s\n", inet_ntoa(addr));
         addr.s_addr = mask;
         printf("나의 서브넷 마스크: %s\n", inet_ntoa(addr));
-        handle = pcap_open_live(dev, BUFSIZ, 1, 1000, errbuf);
+        handle = pcap_open_live(dev, BUFSIZ, 1, 200, errbuf);
         if (handle == NULL) {
                 printf("장치를 열 수 없습니다.\n");
                 printf("error message: %s", errbuf);
@@ -175,11 +171,14 @@ int main(void) {
         
         while(1) 
         {
-                res = pcap_next_ex(handle, &header, &packet);
-                packet2 = (u_char*)packet;
-                parsing();
-                send_packet(packet2,handle);
-		printf("sending packet to target....\n");
+        packet2 = (u_char*)packet;
+        parsing();
+        if(pcap_sendpacket(handle, packet2, 200) != 0)
+		    fprintf(stderr, "\nError sending the packet! : %s\n", pcap_geterr(handle));
+       
+		res = pcap_next_ex(handle, &header, &packet);
+                
+        printf("sending packet to target....\n");
                 if(res>=0)
                         continue;
                 else
