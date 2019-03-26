@@ -240,8 +240,7 @@ int main(void) {
         
         while(1)
 {       
-        packet=request_packet(packet);
-        request_packet(packet, my_MAC, my_ipaddr, argv[1]);
+        packet=request_packet(packet, my_MAC, my_ipaddr, argv[1]);
 }
 
         while(pcap_next_ex(handle, &header, &packet) == 1) 
