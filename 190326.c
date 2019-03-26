@@ -31,10 +31,8 @@ struct e_i_t_packet {
         u_char ether_shost[ETHER_ADDR_LEN]; // 출발지 MAC 주소
         u_short ether_type;
         
-        
-        u_char ip_vhl;
-        u_char ip_tos;
-        u_short ip_len;
+        uint16_t ip_buf;
+	    uint16_t total_len;
         u_short ip_id;
         u_short ip_off;
         #define IP_RF 0x8000
@@ -49,8 +47,8 @@ struct e_i_t_packet {
         uint8_t dst_ip[PROTOCOL_LEN]; // 목적지 IP 주소
         u_short th_sport; // 출발지 TCP 주소
         u_short th_dport; // 목적지 TCP 주소
-        tcp_seq th_seq;
-        tcp_seq th_ack;
+        u_int th_seq;
+        u_int th_ack;
         u_char th_offx2;
         #define TH_OFF(th) (((th)->th_offx2 & 0xf0) >> 4)
         u_char th_flags;
@@ -78,13 +76,9 @@ void send_packet(const u_char *d_packet, pcap_t* handle)
 }
 
 
-typedef u_int tcp_seq;
+
 
 struct *e_i_t_packet;
-u_int size_ip;
-u_int size_tcp;
-int first=1;
-tcp_seq dummy_seq;
 
 void * get_mac_address(uint8_t * my_MAC)
 {
@@ -134,17 +128,21 @@ void * get_ip_address(uint8_t * my_ipaddr, char * interface)
 struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_MAC,uint8_t * my_ipaddr, char * argv)
 {
     int i;
+        for(i=0;i<6;i++)
+        {
+            packet.ether_shost[i]=my_MAC[i]; // 출발지 MAC 주소
+        }
         u_char ether_dhost[ETHER_ADDR_LEN]; // 목적지 MAC 주소
-        u_char ether_shost[ETHER_ADDR_LEN]; // 출발지 MAC 주소
-        u_short ether_type;
-        u_char ip_vhl;
-        u_char ip_tos;
-        u_short ip_len;
+        
+        packet.ether_type=0x0800;
+        packet.ip_buf=0x4500;
+	    packet.total_len=0x0028;
+
         u_short ip_id;
         u_short ip_off;
         
-        u_char ip_ttl;
-        packet.ip_p=1; // IP 프로토콜 유형
+        packet.ip_ttl=0x40;
+        packet.ip_p=0x06; // IP 프로토콜 유형
         u_short ip_sum;
        
        
@@ -152,61 +150,24 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_MAC,
             packet.src_ip[i]=my_ipaddr[i]; // 출발지 IP 주소
         
         uint32_t num = inet_addr(argv);
-
         packet.dst_ip[0] = num; // 목적지 IP 주소
         packet.dst_ip[0] = num >> 8; // 목적지 IP 주소
         packet.dst_ip[0] = num >> 16; // 목적지 IP 주소
         packet.dst_ip[0] = num >> 24; // 목적지 IP 주소
 
-
-
-
-        u_short th_sport; // 출발지 TCP 주소
-        u_short th_dport; // 목적지 TCP 주소
-        tcp_seq th_seq;
-        tcp_seq th_ack;
-        u_char th_offx2;
+        packet.th_sport=0xec74; // 출발지 TCP 주소
+        packet.th_dport=0x0050; // 목적지 TCP 주소
+        packet.th_seq=0x00000000;
+        packet.th_ack=0x00000000;
+        packet.th_offx2=0xa0;
         
-        u_char th_flags;
+        u_char th_flags=0x02;
         
-        u_short th_win;
+        u_short th_win=0x7210;
         u_short th_sum;
-        u_short th_urp;
-    printf("------------------------------------------------------\n");
-        ethernet = (struct sniff_ethernet*)(packet);
-        printf("MAC 출발지 주소 :");
-        for(i = 0; i < ETHER_ADDR_LEN; i++) {
-                printf("%02x ", ethernet->ether_shost[i]);
-        }
-        printf("\nMAC 목적지 주소 :");
-        for(i = 0; i < ETHER_ADDR_LEN; i++) {
-                printf("%02x ", ethernet->ether_dhost[i]);
-        }
-        printf("\nMAC 목적지 주소 :");
-        for(i = 0; i < ETHER_ADDR_LEN; i++) {
-                printf("%02x ", ethernet->ether_dhost[i]);
-        }
-        ip = (struct sniff_ip*)(packet + SIZE_ETHERNET);
-        memcpy(&(ip->ip_dst.s_addr),&target_ip,sizeof(target_ip));
-	    size_ip = IP_HL(ip)*4;
-        printf("\nIP 출발지 주소: %s\n", inet_ntoa(ip->ip_src));
-        printf("IP 목적지 주소: %s\n", inet_ntoa(ip->ip_dst));
-        tcp = (struct sniff_tcp*)(packet + SIZE_ETHERNET + size_ip);
-
-        if(first==1)
-                dummy_seq=tcp->th_seq;
-	    
+        packet.th_urp=0x0000;
+    
         
-        memcpy(&(tcp->th_seq),&dummy_seq,sizeof(dummy_seq));
-        size_tcp = TH_OFF(tcp)*4;
-        printf("출발지 포트: %d\n", ntohs(tcp->th_sport));
-        printf("목적지 포트: %d\n", ntohs(tcp->th_dport));
-        printf("seq: %d\n", ntohs(tcp->th_seq));
-	    payload = (u_char *)(packet + SIZE_ETHERNET + size_ip + size_tcp);
-        payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
-        
-        printf("\n------------------------------------------------------\n");
-    	first++;
 
         return packet;
 }
