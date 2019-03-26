@@ -98,18 +98,26 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_ipad
         packet.ip_sum=0x0000;
        
         // 출발지 IP 주소
-         // 목적지 IP 주소
+        // 목적지 IP 주소
+
+        my_ipaddr[0]=0xc0;
+        my_ipaddr[1]=0xa8;
+        my_ipaddr[2]=0x2c;
+        my_ipaddr[3]=0x8f;
 
         packet.src_ip[0] = my_ipaddr[0];
         packet.src_ip[1] = my_ipaddr[1];
         packet.src_ip[2] = my_ipaddr[2];
         packet.src_ip[3] = my_ipaddr[3];
 
+        my_ipaddr[3]=0x91;
+
         packet.dst_ip[0] = my_ipaddr[0];
         packet.dst_ip[1] = my_ipaddr[1];
         packet.dst_ip[2] = my_ipaddr[2];
         packet.dst_ip[3] = my_ipaddr[3];  
 
+        packet.th_sport=ntohs(0x9a9e);
         packet.th_dport=ntohs(0x23e6); // 목적지 TCP 주소
 
         packet.th_seq=0x00000000;
@@ -133,10 +141,7 @@ int main(int argc, char* argv[]) {
 
      uint8_t my_ipaddr[4];
 
-     my_ipaddr[0]=0xc0;
-     my_ipaddr[1]=0xa8;
-     my_ipaddr[2]=0x2c;
-     my_ipaddr[3]=0x8f;
+     
 
 
 	dev = pcap_lookupdev(errbuf);
