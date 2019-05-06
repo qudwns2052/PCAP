@@ -85,12 +85,12 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_ipad
         packet.ether_shost[4]=0x3e;
         packet.ether_shost[5]=0x25;
 
-        packet.ether_type=ntohs(0x0800);
+        packet.ether_type=htons(0x0800);
         
-        packet.ip_buf=ntohs(0x4500);
-	    packet.total_len=ntohs(0x0028);
+        packet.ip_buf=htons(0x4500);
+	    packet.total_len=htons(0x0028);
 
-        packet.ip_id=0x0000;
+        packet.ip_id=htons(0x1234);
         packet.ip_off=0x0000;
         
         packet.ip_ttl=0x40;
@@ -98,26 +98,19 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_ipad
         packet.ip_sum=0x0000;
        
         // 출발지 IP 주소
-        // 목적지 IP 주소
-
-        my_ipaddr[0]=0xc0;
-        my_ipaddr[1]=0xa8;
-        my_ipaddr[2]=0x2c;
-        my_ipaddr[3]=0x8f;
+         // 목적지 IP 주소
 
         packet.src_ip[0] = my_ipaddr[0];
         packet.src_ip[1] = my_ipaddr[1];
         packet.src_ip[2] = my_ipaddr[2];
         packet.src_ip[3] = my_ipaddr[3];
 
-        my_ipaddr[3]=0x91;
-
         packet.dst_ip[0] = my_ipaddr[0];
         packet.dst_ip[1] = my_ipaddr[1];
         packet.dst_ip[2] = my_ipaddr[2];
         packet.dst_ip[3] = my_ipaddr[3];  
 
-        packet.th_dport=ntohs(0x23e6); // 목적지 TCP 주소
+        packet.th_dport=htons(0x23e6); // 목적지 TCP 주소
 
         packet.th_seq=0x00000000;
         packet.th_ack=0x00000000;
@@ -125,7 +118,7 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_ipad
         
         packet.th_flags=0x02;
         
-        packet.th_win=ntohs(0x7210);
+        packet.th_win=htons(0x7210);
         packet.th_sum=0x0000;
         packet.th_urp=0x0000;
     
@@ -134,13 +127,123 @@ struct e_i_t_packet request_packet(struct e_i_t_packet packet, uint8_t * my_ipad
         return packet;
 }
 
+unsigned short ip_checksum(struct e_i_t_packet* packet) {
+
+    /* Acquire IP checksum */
+
+    /*
+
+    Checksum for Internet Protocol:
+    One's complement of the one's complement sum of the 16 bit words in the header.
+    So we get the first 16 bits of the header then add it to the sum, and then
+    we get the next 16 bits, and add it, and so on.
+    ...0100101010110101 -> "..." represents more bits 
+    1111111111111111 -> this is 131071 in base 10 
+    0000100101010110101 -> notice how the "..." bits are now 0's
+
+    */
+
+    /* One's complement sum */
+
+    unsigned long long* ptr;
+    unsigned long long hdr;
+    unsigned short sum = 0;
+    unsigned long mask = 131071;
+
+    
+
+    ptr = (unsigned long long*)packet;  // cast structure
+    hdr = *ptr; // get hdr 
+
+    hdr >>= 8*14;
+
+    for (int i = 0; i < 10; i++) { // 20 bytes -> 160 bits / 16 bits = 10 words
+
+            sum += (hdr & mask); // add to sum
+
+            hdr >>= 16; // shift the next 16 bits
+
+  }
+
+  sum = ~sum; // inverse 
+
+  return sum;
+
+}
+
+unsigned short tcp_checksum(struct e_i_t_packet *packet)
+{
+
+          /* Calculate TCP checksum */
+
+          struct pseudo_hdr* pseudo_hdr;
+          u_char* buffer;
+          u_char* segment;
+          u_char* pseudo_segment;
+          unsigned short sum = 0;
+          unsigned long mask = 131071;
+          unsigned long long* ptr;
+          unsigned long long hdr;
+
+          pseudo_hdr = malloc(200); // allocate memory
+          buffer = malloc(32); // allocate for 32 bytes of information 
+
+          if (pseudo_hdr == NULL || buffer == NULL) { // if memory wasn't allocated properly
+
+              if (pseudo_hdr != NULL) free(pseudo_hdr);
+              if (buffer != NULL) free(buffer);
+              return 0;
+
+          }
+
+          pseudo_hdr->saddr = (unsigned long)packet->src_ip; // we add the  cast because the fields if of type u_int_32
+          pseudo_hdr->daddr = (unsigned long)packet->dst_ip; // same reason for adding the cast as above
+          memset(&pseudo_hdr->reserved,0,8); // set these 8 bits to 0
+          pseudo_hdr->proto = IPPROTO_TCP; // this will always be 6
+          pseudo_hdr->len = htons(0x14); // length of tcp header
+
+          /* Place both headers into a buffer */
+
+          segment = (u_char*)packet;
+          segment = (segment+ 8 * 34); 
+          pseudo_segment = (u_char*)pseudo_hdr; 
+
+          /* Concactenate */
+
+          strncat((char*)buffer,(char*)pseudo_segment,12); // first the pseudo header 
+          strncat((char*)buffer,(char*)segment,20); // then the TCP segment 
+
+          /* Calculate checksum just like IP checksum */
+
+          ptr = (unsigned long long*)buffer; // convert buffer 
+
+          hdr = *ptr; // dereference for clarity in following clode
+
+          for (int i = 0; i < 16; i++) { // 32 bytes -> 256 bits / 16 bits = 16 words
+
+               sum += (hdr & mask); // apply mask to header and add to sum
+
+               hdr >>= 16;  // shift the next 16 bits
+
+           }
+
+
+           sum = ~sum; // bitwise NOT operation
+
+           return sum;
+
+           };
+
 int main(int argc, char* argv[]) {
 
     struct e_i_t_packet packet;
 
      uint8_t my_ipaddr[4];
 
-     
+     my_ipaddr[0]=0xc0;
+     my_ipaddr[1]=0xa8;
+     my_ipaddr[2]=0x2c;
+     my_ipaddr[3]=0x92;
 
 
 	dev = pcap_lookupdev(errbuf);
@@ -164,6 +267,8 @@ int main(int argc, char* argv[]) {
     printf("Let's Make packet....\n\n");
 
         packet=request_packet(packet, my_ipaddr);
+        packet.ip_sum=ip_checksum(&packet);
+        packet.th_sum=tcp_checksum(&packet);
         send_packet(packet, handle);
         sleep(1);
 }
