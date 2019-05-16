@@ -12,7 +12,7 @@
 #include "printarr.h"
 #include "protocol_check.h"
 #include "swap_endian.h"
-#define ETHER_LEN 14 // Ethernet header length
+#define SIZE_ETHERNET 14 // Ethernet header length
 #define ETHERTYPE_ARP 0x0806 // Ethernet type (ARP: 0x0806, RARP: 0x0835)
 // ARP packet
 #define ARP_HTYPE 0x0001 // Hardware type (ETHERNET: 0x0001)

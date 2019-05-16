@@ -1,7 +1,10 @@
 /* Ethernet addresses are 6 bytes */
 #include <stdint.h>
 #define ETHER_ADDR_LEN	6
-
+#define SIZE_ETHERNET 14
+#define SIZE_IP 20
+#define SIZE_TCP 20
+#define SIZE_HEADER 54
 	/* Ethernet header */
 	struct sniff_ethernet {
 		u_char ether_dhost[ETHER_ADDR_LEN]; /* Destination host address */
@@ -23,8 +26,8 @@
 		u_char ip_ttl;		/* time to live */
 		u_char ip_p;		/* protocol */
 		u_short ip_sum;		/* checksum */
-		uint32_t ip_src;
-		uint32_t ip_dst;	 /* source and dest address */
+		char ip_src[4];
+		char ip_dst[4];	 /* source and dest address */
 	};
 	#define IP_HL(ip)		(((ip)->ip_vhl) & 0x0f)
 	#define IP_V(ip)		(((ip)->ip_vhl) >> 4)
