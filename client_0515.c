@@ -19,6 +19,9 @@ u_char *dummy_packet2;
 int res;
 
 int to_header_size;
+u_int size_ip;
+u_int size_tcp;
+int SIZE_REAL_HEADER;
 
 struct sniff_ethernet *ethernet; // 이더넷 헤더
 struct sniff_ip *ip;// IP 헤더
@@ -84,18 +87,23 @@ int main(int argc, char* argv[])
         /*        Parsing      */
         ethernet=(struct sniff_ethernet*)(packet);
 	ip=(struct sniff_ip*)(packet+SIZE_ETHERNET);
-	tcp=(struct sniff_tcp*)(packet+SIZE_ETHERNET+SIZE_IP);
-	payload=(u_char*)(packet+SIZE_HEADER);
-        payload_len = ntohs(ip->ip_len) - (SIZE_IP + SIZE_TCP);
+        size_ip= IP_HL(ip)*4;
+	tcp=(struct sniff_tcp*)(packet+SIZE_ETHERNET+size_ip);
+        size_tcp=TH_OFF(tcp)*4;
+        
+        SIZE_REAL_HEADER = SIZE_ETHERNET+size_ip+size_tcp;
+	
+        payload=(u_char*)(packet+SIZE_REAL_HEADER);
+        payload_len = ntohs(ip->ip_len) - (size_ip + size_tcp);
         /**********************************************************/
         
 
-
         /*        packing           */
-        if(!memcmp(ip->ip_src, my_ip, 4))
+        if(!memcmp(ip->ip_src, my_ip, 4)
+            &&memcmp(ip->ip_dst, target_ip, 4))
         {
                 printf("packing....\n");
-                to_header_size=(SIZE_HEADER*2)+payload_len; // fake header + real header + real payload
+                to_header_size=(SIZE_REAL_HEADER*2)+payload_len; // fake header + real header + real payload
       
                 if(to_first==1)
         {
@@ -107,14 +115,14 @@ int main(int argc, char* argv[])
         dummy_packet=(u_char*)malloc(sizeof(u_char)*to_header_size);
       
         memset(dummy_packet, 0, to_header_size);
-	memcpy(dummy_packet, packet, SIZE_HEADER);
-	memcpy(dummy_packet+SIZE_HEADER, packet, to_header_size - SIZE_HEADER);
+	memcpy(dummy_packet, packet, SIZE_REAL_HEADER);
+	memcpy(dummy_packet+SIZE_REAL_HEADER, packet, to_header_size - SIZE_REAL_HEADER);
 
         ethernet=(struct sniff_ethernet*)(dummy_packet);
 	ip=(struct sniff_ip*)(dummy_packet+SIZE_ETHERNET);
-	tcp=(struct sniff_tcp*)(dummy_packet+SIZE_ETHERNET+SIZE_IP);
+	tcp=(struct sniff_tcp*)(dummy_packet+SIZE_ETHERNET+size_ip);
         
-        u_short update_ip_len = htons(to_header_size);
+        u_short update_ip_len = htons(to_header_size-SIZE_ETHERNET);
         memcpy(&(tcp->th_seq), &to_dummy_seq, sizeof(to_dummy_seq));
         memcpy(ip->ip_dst, target_ip, 4); //update ip_dst as target ip
         memcpy(&(ip->ip_len), &update_ip_len, sizeof(update_ip_len));  //update ip_total_len as pckt size+fake header size
@@ -132,11 +140,11 @@ int main(int argc, char* argv[])
         dummy_packet2=(u_char*)malloc(sizeof(u_char)*payload_len);
       
         memset(dummy_packet2, 0, payload_len);
-	memcpy(dummy_packet2, packet+SIZE_HEADER, payload_len);
+	memcpy(dummy_packet2, packet+SIZE_REAL_HEADER, payload_len);
 
         ethernet=(struct sniff_ethernet*)(dummy_packet2);
 	ip=(struct sniff_ip*)(dummy_packet2+SIZE_ETHERNET);
-	
+
         memcpy(ip->ip_dst, my_ip, 4); //update ip_dst as target ip
         pcap_sendpacket(handle, dummy_packet2, payload_len);
         }
